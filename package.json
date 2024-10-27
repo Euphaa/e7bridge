@@ -1,0 +1,17 @@
+{
+  "name": "untitled",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "",
+  "main": "src/Index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mineflayer": "^4.20.1",
+    "discord.js": "^14.16.3"
+  }
+}
