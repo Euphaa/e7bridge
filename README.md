@@ -1,0 +1,1 @@
+to start out, clone the repository and make sure you have the dependencies installed via npm install. copy the example-config.json to config.json and fill in your info. then run the start script. if you are on linux you will have to chmod the shell script.
