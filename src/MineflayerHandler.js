@@ -19,7 +19,7 @@ class MineflayerHandler
         this.bot.on("end", this._handleMinecraftDisconnect.bind(this));
         this.bot.on("message", this._handleMinecraftMsg.bind(this));
         this.messageBuffer = [];
-        setTimeout(this.sendLimbo.bind(this), 2_000);
+        setTimeout(this.sendLimbo.bind(this), 10_000);
         setInterval(this.sendLimbo.bind(this), 60_000);
     }
 
