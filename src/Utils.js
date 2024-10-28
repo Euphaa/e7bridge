@@ -38,5 +38,22 @@ class Utils
 
         return timeInMs;
     }
+
+    static msToTimeNotation(ms)
+    {
+        let seconds = Math.floor(ms / 1000);
+        let minutes = Math.floor(seconds / 60);
+        let hours = Math.floor(minutes / 60);
+
+        seconds = seconds % 60;
+        minutes = minutes % 60;
+
+        let timeString = '';
+        if (hours > 0) timeString += hours + 'h';
+        if (minutes > 0) timeString += minutes + 'm';
+        if (seconds > 0 || timeString === '') timeString += seconds + 's';
+
+        return timeString;
+    }
 }
 export default Utils;

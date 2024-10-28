@@ -1,7 +1,6 @@
 import Utils from "./Utils.js";
 import mineflayer from "mineflayer";
 import Index from "./Index.js";
-import fs from "fs";
 
 
 class MineflayerHandler
@@ -49,12 +48,17 @@ class MineflayerHandler
 
         try
         {
-            this.bot.chat(`/msg ${player} ${message}`);
+            this.sendDmTo(player, message);
         }
         catch (e)
         {
             console.error(e);
         }
+    }
+
+    sendDmTo(player, msg)
+    {
+        this.bot.chat(`/msg ${player} ${msg}`);
     }
 
     async getOnlineMembers(retrys=100)
@@ -121,16 +125,23 @@ class MineflayerHandler
         {
             words.shift();
             if (words[0].startsWith("[")) words.shift(); // get rid of hypixel rank
-            words[0] = words[0].slice(0, -1);
+            words[0] = words[0].slice(0, -1); // get rid of colon after name.
 
             switch (words.splice(1, 1)[0].toLowerCase())
             {
+                // words at this point should follow [ign, word, word, ...word]
                 case 'rm':
                 case 'remindme':
                 {
                     console.log('setting up reminder')
                     this.remindPlayer(words.shift(), Utils.parseTimeNotation(words.shift()), words.join(' '));
                     break;
+                }
+                case "s":
+                case "sub":
+                case "subscribe":
+                {
+                    Index.scheduler.parsePlayerRequest(words)
                 }
             }
             return;

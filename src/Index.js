@@ -1,6 +1,7 @@
 import DiscordHandler from "./DiscordHandler.js";
 import MineflayerHandler from "./MineflayerHandler.js";
 import fs from "fs";
+import Scheduler from "./Scheduler.js";
 
 class Index
 {
@@ -8,11 +9,13 @@ class Index
     static CONFIG;
     static discordHandler;
     static mineflayerHandler;
+    static scheduler;
 
 
     static async main()
     {
         Index.getConfig();
+        Index.scheduler = new Scheduler();
         Index.discordHandler = await new DiscordHandler().init();
         Index.mineflayerHandler = new MineflayerHandler();
         if (process.argv.includes("-r")) await Index.discordHandler.registerCommandsWithServer();
