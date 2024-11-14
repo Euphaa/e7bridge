@@ -2,7 +2,6 @@ import Utils from "./Utils.js";
 import mineflayer from "mineflayer";
 import Index from "./Index.js";
 
-
 class MineflayerHandler
 {
     bot;
@@ -162,6 +161,8 @@ class MineflayerHandler
             return;
         }
 
+
+
         words.shift(); // get rid of "Guild > "
         words.shift(); // get rid of "Guild > "
         if (words[0].startsWith("[")) words.shift(); // get rid of hypixel rank
@@ -178,9 +179,50 @@ class MineflayerHandler
         }
         words[0] = words[0].slice(0, -1); // removes the colon from the name
 
+        if (words[1].startsWith("!"))
+        {
+            this.parseGuildCommand(words);
+        }
+
         // placeMentions(words);
 
         Index.discordHandler.sendWebhookMessage(words.shift(), words.join(" "));
+    }
+
+    parseGuildCommand(words)
+    {
+        switch (words[1])
+        {
+            case "!r":
+            case "!roll":
+            {
+                let maxRoll = 6;
+                if (words.length > 2) maxRoll = parseInt(words[2])
+                const roll = 1 + Math.floor(Math.random() * maxRoll);
+                const msg = `${words[0]} rolled ${roll}`;
+
+
+                this.sendToGc(msg);
+                Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
+                break;
+            }
+            case "!gay":
+            {
+                const msg = `${words[0]} is ${Math.floor(Math.random() * 101)}% gay`;
+                this.sendToGc(msg);
+                Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
+                break;
+            }
+            case "!cf":
+            case "!flip":
+            case "!coinflip":
+            {
+                const msg = `${words[0]} flipped a coin and got ${Math.random() < .5 ? "heads" : "tails"}!`;
+                this.sendToGc(msg);
+                Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
+                break;
+            }
+        }
     }
 
     getMessageType(msg)
