@@ -38,6 +38,7 @@ class MineflayerHandler
     async remindPlayer(player, timeMs, message, iter=0)
     {
         if (iter > 10) return;
+
         if (timeMs < 1000) return;
         await Utils.sleep(timeMs);
         if (!this.bot)
@@ -133,8 +134,15 @@ class MineflayerHandler
                 case 'rm':
                 case 'remindme':
                 {
-                    console.log('setting up reminder')
-                    this.remindPlayer(words.shift(), Utils.parseTimeNotation(words.shift()), words.join(' '));
+                    const player = words.shift();
+                    const time = Utils.parseTimeNotation(words.shift());
+                    const reminder = words.join(" ");
+                    const englishTime = Utils.msToEnglishTime(time);
+
+                    this.sendDmTo(`i will remind you about ${reminder} in ${englishTime}`)
+                    console.log(`setting up reminder for ${player} in ${englishTime}`)
+
+                    this.remindPlayer(player, time, reminder);
                     break;
                 }
                 case "s":
