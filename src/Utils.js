@@ -70,7 +70,10 @@ class Utils
         if (minutes > 0) time.push(`${minutes} minutes`);
         if (seconds > 0) time.push(`${seconds} seconds`);
 
-        return `${time.splice(0, time.length-1).join(", ")} and ${time[time.length-1]}`
+        if (time.length > 1) return `${time.splice(0, time.length-1).join(", ")} and ${time[time.length-1]}`;
+        else return time[0];
+
+        return
     }
 }
 export default Utils;

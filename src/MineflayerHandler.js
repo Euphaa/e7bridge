@@ -143,8 +143,8 @@ class MineflayerHandler
                     const reminder = words.join(" ");
                     const englishTime = Utils.msToEnglishTime(time);
 
-                    this.sendDmTo(`i will remind you about ${reminder} in ${englishTime}`)
-                    console.log(`setting up reminder for ${player} in ${englishTime}`)
+                    this.sendDmTo(player, `i will remind you about ${reminder} in ${englishTime}.`)
+                    console.log(`i will remind you about ${reminder} in ${englishTime}. (for ${player})`)
 
                     this.remindPlayer(player, time, reminder);
                     break;
