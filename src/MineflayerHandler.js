@@ -34,6 +34,11 @@ class MineflayerHandler
         this.bot.chat("/gc " + msg);
     }
 
+    sendToGcWithRandomString(msg)
+    {
+        this.sendToGc(msg + ` <${Math.random().toString(36).slice(2, 5)}>`);
+    }
+
     async remindPlayer(player, timeMs, message, iter=0)
     {
         if (iter > 10) return;
@@ -179,37 +184,36 @@ class MineflayerHandler
         }
         words[0] = words[0].slice(0, -1); // removes the colon from the name
 
-        if (words[1].startsWith("!"))
+        const name = words.shift()
+        Index.discordHandler.sendWebhookMessage(name, words.join(" "));
+
+        if (words[0].startsWith("!"))
         {
-            this.parseGuildCommand(words);
+            this.parseGuildCommand(name, words);
         }
-
-        // placeMentions(words);
-
-        Index.discordHandler.sendWebhookMessage(words.shift(), words.join(" "));
     }
 
-    parseGuildCommand(words)
+    parseGuildCommand(name, words)
     {
-        switch (words[1])
+        switch (words[0])
         {
             case "!r":
             case "!roll":
             {
                 let maxRoll = 6;
-                if (words.length > 2) maxRoll = parseInt(words[2])
+                if (words.length > 1) maxRoll = parseInt(words[1])
                 const roll = 1 + Math.floor(Math.random() * maxRoll);
-                const msg = `${words[0]} rolled ${roll}`;
+                const msg = `${name} rolled ${roll}`;
 
 
-                this.sendToGc(msg);
+                this.sendToGcWithRandomString(msg);
                 Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
                 break;
             }
             case "!gay":
             {
-                const msg = `${words[0]} is ${Math.floor(Math.random() * 101)}% gay`;
-                this.sendToGc(msg);
+                const msg = `${name} is ${Math.floor(Math.random() * 101)}% gay`;
+                this.sendToGcWithRandomString(msg);
                 Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
                 break;
             }
@@ -217,8 +221,8 @@ class MineflayerHandler
             case "!flip":
             case "!coinflip":
             {
-                const msg = `${words[0]} flipped a coin and got ${Math.random() < .5 ? "heads" : "tails"}!`;
-                this.sendToGc(msg);
+                const msg = `${name} flipped a coin and got ${Math.random() < .5 ? "heads" : "tails"}!`;
+                this.sendToGcWithRandomString(msg);
                 Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
                 break;
             }
