@@ -63,6 +63,7 @@ class DiscordHandler
 
     sendMessageWithoutWebhook(msg)
     {
+        if (msg.length < 1) return;
         this.channel.send(msg)
     }
 
