@@ -238,7 +238,7 @@ class DiscordHandler
         if (message.webhookId) return false;
         if (message.system) return false;
         if (message.embeds && message.embeds.length > 0) return false;
-        if (message.content === '') return false;
+        // if (message.content === '') return false;
 
         return true;
     }

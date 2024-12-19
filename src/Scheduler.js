@@ -11,7 +11,7 @@ class Scheduler
             {name:"dark auction", interval:1000*60*60, initial:1730084100000%(1000*60*60),  aliases: ["da", "darkauction"]},
             {name:"farming contest", interval:1000*60*60, initial:1730096100000%(1000*60*60),  aliases: ["contest", "jacob"]},
             {name:"spider's den thunder", interval:1000*60*60*3, initial:1730086500000%(1000*60*60),  aliases: ["thunder"]},
-            {name:"cult of the fallen star", interval:1000*60*200, initial:1730088900000%(1000*60*60),  aliases: ["thunder"]},
+            {name:"cult of the fallen star", interval:1000*60*200, initial:1730088900000%(1000*60*60),  aliases: ["cult", "star", "stars"]},
             {name:"spooky festival", interval:1000*60*60*124, initial:1730084100000%(1000*60*60*124),  aliases: ["spooky"]},
             {name:"traveling zoo", interval:1000*60*60*124, initial:1730242500000%(1000*60*60*124), aliases: ["zoo", "oringo"]},
             {name:"season of jerry", interval:1000*60*60*124, initial:1730344500000%(1000*60*60*124), aliases: ["jerry"]},
@@ -148,12 +148,12 @@ class Scheduler
 
         console.log(`notifying ${request.player} of ${request.event} at ${(Date.now()/1000) % 24*60*60}`)
 
-        Index.mineflayerHandler.sendDmTo(player, `this is a reminder of ${event} in ${Utils.msToTimeNotation(paddingTime)}. to stop notifs of this event, reply with /r sub -u ${request.event}`)
+        Index.mineflayerHandler.sendDmTo(player, `this is a reminder of ${event} in ${Utils.msToTimeNotation(paddingTime)}. to stop notifs of this event, reply with /r sub -u ${request.event}`);
 
         if (repeats && repeats > 0)
         {
             request.repeats--;
-            this.subscribePlayerTo(request)
+            this.subscribePlayerTo(request);
         }
     }
 }
