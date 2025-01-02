@@ -166,12 +166,10 @@ class MineflayerHandler
             return;
         }
 
-
-
         words.shift(); // get rid of "Guild > "
         words.shift(); // get rid of "Guild > "
         if (words[0].startsWith("[")) words.shift(); // get rid of hypixel rank
-        if (words[0] === this.bot.username) return; // ignore msgs sent by us
+        if (words[0].includes(this.bot.username)) return;
         if (words[1].startsWith('[')) // get rid of guild rank
         {
             words[0] = words[0] + ':';
@@ -225,6 +223,12 @@ class MineflayerHandler
                 this.sendToGcWithRandomString(msg);
                 Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
                 break;
+            }
+            case "!muterjl_":
+            case "!muterjl":
+            {
+                if (this.bot === null) return;
+                this.bot.chat("/g mute rjl_ 1m");
             }
         }
     }
