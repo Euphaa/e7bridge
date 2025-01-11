@@ -11,7 +11,7 @@ class Scheduler
             {name:"dark auction", interval:1000*60*60, initial:1730084100000%(1000*60*60),  aliases: ["da", "darkauction"]},
             {name:"farming contest", interval:1000*60*60, initial:1730096100000%(1000*60*60),  aliases: ["contest", "jacob"]},
             {name:"spider's den thunder", interval:1000*60*60*3, initial:1730086500000%(1000*60*60),  aliases: ["thunder"]},
-            {name:"cult of the fallen star", interval:1000*60*200, initial:1730088900000%(1000*60*60),  aliases: ["cult", "star", "stars"]},
+            // {name:"cult of the fallen star", interval:1000*60*200, initial:1730088900000%(1000*60*60),  aliases: ["cult", "star"]},
             {name:"spooky festival", interval:1000*60*60*124, initial:1730084100000%(1000*60*60*124),  aliases: ["spooky"]},
             {name:"traveling zoo", interval:1000*60*60*124, initial:1730242500000%(1000*60*60*124), aliases: ["zoo", "oringo"]},
             {name:"season of jerry", interval:1000*60*60*124, initial:1730344500000%(1000*60*60*124), aliases: ["jerry"]},
@@ -42,7 +42,7 @@ class Scheduler
 
         if (words[1] === "list")
         {
-            Index.mineflayerHandler.sendDmTo(words[0], `${[...this.events.keys()]}`);
+            Index.mineflayerHandler.sendDmTo(words[0], `${[...Scheduler.events.keys()].join(", ")}`);
             return;
         }
 
@@ -78,6 +78,8 @@ class Scheduler
 
         Index.mineflayerHandler.sendDmTo(request.player, `i will remind you ${Utils.msToTimeNotation(request.paddingTime)} before every ${Scheduler.events.get(request.event).name}.`)
     }
+
+    getKey
 
     getPlayersEvents(player)
     {
@@ -119,6 +121,7 @@ class Scheduler
         let thisPlayersEvents = this.getPlayersEvents(request.player);
 
         let reminderTime = Scheduler.getNextEventTime(request.event) - request.paddingTime;
+        if (reminderTime < 0) reminderTime = Scheduler.getNextNextEventTime(request.event) - request.paddingTime;
         if (reminderTime < 0) return;
 
         request.timeoutId = setTimeout(this.notifyPlayerOfEvent.bind(this), reminderTime, request);
@@ -137,6 +140,18 @@ class Scheduler
         return event.interval - ((Date.now() - event.initial) % event.interval);
     }
 
+    static getNextNextEventTime(eventName)
+    {
+        let event = Scheduler.events.get(eventName);
+
+        if (!event)
+        {
+            console.log(`could not find event matching ${eventName}.`);
+            return;
+        }
+        return (2 * event.interval) - ((Date.now() - event.initial) % event.interval);
+    }
+
 
     /**
      *
@@ -150,11 +165,12 @@ class Scheduler
 
         Index.mineflayerHandler.sendDmTo(player, `this is a reminder of ${event} in ${Utils.msToTimeNotation(paddingTime)}. to stop notifs of this event, reply with /r sub -u ${request.event}`);
 
-        if (repeats && repeats > 0)
+        if (repeats && repeats !== 0)
         {
-            request.repeats--;
             this.subscribePlayerTo(request);
         }
+
+        request.repeats--;
     }
 }
 export default Scheduler;
