@@ -5,6 +5,7 @@ import { Client as DiscordClient, Events, GatewayIntentBits, SlashCommandBuilder
 import { REST } from '@discordjs/rest';
 import fs from 'fs';
 import pathToFileURL from "url";
+import MineflayerHandler from "./MineflayerHandler.js";
 
 
 class DiscordHandler
@@ -134,7 +135,6 @@ class DiscordHandler
         try {
             console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-            // The put method is used to fully refresh all commands in the guild with the current set
             const data = await rest.put(
                 Routes.applicationGuildCommands(this.discord.id, this.guild.id),
                 {body: commands},
@@ -144,7 +144,6 @@ class DiscordHandler
         }
         catch (error)
         {
-            // And of course, make sure you catch and log any errors!
             console.error(error);
         }
 
@@ -204,6 +203,7 @@ class DiscordHandler
                 Index.mineflayerHandler.sendToGc(`${name}: ${this.replaceMentions("[sent file] " + message.content)}`);
                 console.log(`Discord Chat > ${name}: ${"[sent file] " + message.content}`);
             }
+            if (message.content.startsWith("!")) Index.mineflayerHandler.parseGuildCommand(name, message.content.split(" "));
         });
     }
 

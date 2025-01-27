@@ -7,8 +7,9 @@ class MineflayerHandler
     bot;
     OPTIONS;
     currentMessageType;
-    messageBuffer;
+    messageBuffer = [];
     onlineMembers;
+    commandQueue = [];
 
     constructor()
     {
@@ -17,21 +18,31 @@ class MineflayerHandler
         this.bot.on("end", this._handleMinecraftDisconnect.bind(this));
         this.bot.on("message", this._handleMinecraftMsg.bind(this));
         this.messageBuffer = [];
-        setTimeout(this.sendLimbo.bind(this), 10_000);
+        setTimeout(this.sendLimbo.bind(this), 5_000);
         setInterval(this.sendLimbo.bind(this), 60_000);
+        setInterval(this._shiftCommandQueue.bind(this), 500)
+    }
+
+    _shiftCommandQueue()
+    {
+        if (this.commandQueue.length < 1) return;
+        let command = this.commandQueue.shift();
+        if (command === null || typeof command !== typeof "" || this.bot === null) return;
+
+        this.bot.chat(command);
     }
 
     sendLimbo()
     {
-        if (!this.bot) return;
-        this.bot.chat('/limbo')
+        this.commandQueue.push("/limbo")
     }
 
     sendToGc(msg)
     {
         if (this.bot === null) return;
-        if (msg.length > 255) msg = msg.slice(0, 255);
-        this.bot.chat("/gc " + msg);
+        if (msg.length > 120) msg = msg.slice(0, 120);
+
+        this.commandQueue.push("/gc " + msg)
     }
 
     sendToGcWithRandomString(msg)
@@ -63,10 +74,10 @@ class MineflayerHandler
 
     sendDmTo(player, msg)
     {
-        this.bot.chat(`/msg ${player} ${msg}`);
+        this.commandQueue.push(`/msg ${player} ${msg}`)
     }
 
-    async getOnlineMembers(retrys=100)
+    async getOnlineMembers(retrys=40)
     {
         while (!this.onlineMembers && retrys > 0)
         {
@@ -90,36 +101,11 @@ class MineflayerHandler
     {
         let msg = jsonMsg.toString();
 
-        /* handle all chat and commands */
-        if (this.currentMessageType)
+        /* handle guild chat */
+
+        if (msg.startsWith("Guild > "))
         {
-            if (this.currentMessageType === 'unknown')
-            {
-                this.currentMessageType = this.getMessageType(msg);
-            }
-            this.messageBuffer.push(msg);
-            if (msg === '-----------------------------------------------------')
-            {
-                switch (this.currentMessageType)
-                {
-                    case 'g online': this.onlineMembers = this.messageBuffer.join('\n');
-                    default: {
-                        this.currentMessageType = null;
-                        this.messageBuffer = [];
-                    }
-                }
-            }
-        }
-        else if (msg === '-----------------------------------------------------')
-        {
-            this.currentMessageType = 'unknown';
-            this.messageBuffer.push(msg);
-            return;
-        }
-        else if (msg === '--------------  Guild: Message Of The Day  --------------')
-        {
-            this.currentMessageType = 'motd';
-            this.messageBuffer.push(msg);
+            this.handleGuildChat(msg);
             return;
         }
 
@@ -128,43 +114,90 @@ class MineflayerHandler
         let words = msg.split(' ');
         if (msg.startsWith('From '))
         {
-            words.shift();
-            if (words[0].startsWith("[")) words.shift(); // get rid of hypixel rank
-            words[0] = words[0].slice(0, -1); // get rid of colon after name.
-
-            switch (words.splice(1, 1)[0].toLowerCase())
-            {
-                // words at this point should follow [ign, word, word, ...word]
-                case 'rm':
-                case 'remindme':
-                {
-                    const player = words.shift();
-                    const time = Utils.parseTimeNotation(words.shift());
-                    const reminder = words.join(" ");
-                    const englishTime = Utils.msToEnglishTime(time);
-
-                    this.sendDmTo(player, `i will remind you about ${reminder} in ${englishTime}.`)
-                    console.log(`i will remind you about ${reminder} in ${englishTime}. (for ${player})`)
-
-                    this.remindPlayer(player, time, reminder);
-                    break;
-                }
-                case "s":
-                case "sub":
-                case "subscribe":
-                {
-                    Index.scheduler.parsePlayerRequest(words)
-                }
-            }
+            this.handleDirectMessage(msg);
             return;
         }
 
-        /* handle guild chat */
+        /* handle all chat */
 
-        if (typeof msg !== "string" || !msg.startsWith("Guild > "))
+        if (msg === '-----------------------------------------------------'
+            || msg === "--------------  Guild: Message Of The Day  --------------")
         {
+            console.log(`|| ${this.messageBuffer.join("\n|| ")}`)
+            if (this.messageBuffer.length < 1) return;
+
+            if (this.messageBuffer[0].startsWith("Guild Name: "))
+            {
+                this.onlineMembers = this.messageBuffer.join("\n");
+            }
+
+            if (this.messageBuffer[0].includes("joined the guild!")
+                || this.messageBuffer[0].includes(" has unmuted "))
+            {
+                Index.discordHandler.sendEmbed(
+                    '-----------------------------------------------------\n'
+                    + this.messageBuffer[0]
+                    + '\n-----------------------------------------------------',
+                    0x21d127
+                );
+            }
+
+            if (this.messageBuffer[0].includes("was kicked from the guild")
+                || this.messageBuffer[0].includes("has muted")
+                || this.messageBuffer[0].includes("left the guild!"))
+            {
+                Index.discordHandler.sendEmbed(
+                    '-----------------------------------------------------\n'
+                    + this.messageBuffer[0]
+                    + '\n-----------------------------------------------------',
+                    0xd12121
+                );
+            }
+
+            this.messageBuffer = [];
             return;
         }
+
+        this.messageBuffer.push(msg);
+        console.log((this.messageBuffer.join("\n")))
+    }
+
+    handleDirectMessage(msg)
+    {
+        let words = msg.split(" ");
+        words.shift();
+        if (words[0].startsWith("[")) words.shift(); // get rid of hypixel rank
+        words[0] = words[0].slice(0, -1); // get rid of colon after name.
+
+        switch (words.splice(1, 1)[0].toLowerCase())
+        {
+            // words at this point should follow [ign, word, word, ...word]
+            case 'rm':
+            case 'remindme':
+            {
+                const player = words.shift();
+                const time = Utils.parseTimeNotation(words.shift());
+                const reminder = words.join(" ");
+                const englishTime = Utils.msToEnglishTime(time);
+
+                this.sendDmTo(player, `i will remind you about ${reminder} in ${englishTime}.`)
+                console.log(`i will remind you about ${reminder} in ${englishTime}. (for ${player})`)
+
+                this.remindPlayer(player, time, reminder);
+                break;
+            }
+            case "s":
+            case "sub":
+            case "subscribe":
+            {
+                Index.scheduler.parsePlayerRequest(words)
+            }
+        }
+    }
+
+    handleGuildChat(msg)
+    {
+        let words = msg.split(" ");
 
         words.shift(); // get rid of "Guild > "
         words.shift(); // get rid of "Guild > "
@@ -193,16 +226,22 @@ class MineflayerHandler
 
     parseGuildCommand(name, words)
     {
+        if (Math.random() > .99
+            || ((name === "rjl_" || name === "rilei") && Math.random() > .9))
+        {
+            this.sendToGcWithRandomString("You are too skill issued to use this command.")
+            Index.discordHandler.sendWebhookMessage(this.bot.username,  "You are too skill issued to use this command.", false);
+            return;
+        }
         switch (words[0])
         {
             case "!r":
             case "!roll":
             {
                 let maxRoll = 6;
-                if (words.length > 1) maxRoll = parseInt(words[1])
+                if (words.length > 1) maxRoll = parseInt(words[1].slice(0, 99));
                 const roll = 1 + Math.floor(Math.random() * maxRoll);
-                const msg = `${name} rolled ${roll}`;
-
+                let msg = `${name} rolled ${roll}`;
 
                 this.sendToGcWithRandomString(msg);
                 Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
@@ -210,7 +249,10 @@ class MineflayerHandler
             }
             case "!gay":
             {
-                const msg = `${name} is ${Math.floor(Math.random() * 101)}% gay`;
+                let roll = Math.floor(Math.random() * 101);
+                if (name === "_brent_") roll = 100;
+                if (name === "MissEepy") roll = 101;
+                const msg = `${name} is ${roll}% gay`;
                 this.sendToGcWithRandomString(msg);
                 Index.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
                 break;
@@ -232,12 +274,5 @@ class MineflayerHandler
             }
         }
     }
-
-    getMessageType(msg)
-    {
-        if (msg.startsWith('Guild Name:')) return "g online";
-        return 'unknown'
-    }
-
 }
 export default MineflayerHandler;
