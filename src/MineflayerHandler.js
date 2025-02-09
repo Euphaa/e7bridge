@@ -39,8 +39,8 @@ class MineflayerHandler
 
     sendToGc(msg)
     {
-        if (this.bot === null) return;
         if (msg.length > 120) msg = msg.slice(0, 120);
+        console.log(`sending to gc: ${msg}`)
 
         this.commandQueue.push("/gc " + msg)
     }
@@ -50,27 +50,27 @@ class MineflayerHandler
         this.sendToGc(msg + ` <${Math.random().toString(36).slice(2, 5)}>`);
     }
 
-    async remindPlayer(player, timeMs, message, iter=0)
-    {
-        if (iter > 10) return;
-
-        if (timeMs < 1000) return;
-        await Utils.sleep(timeMs);
-        if (!this.bot)
-        {
-            await this.remindPlayer(player, 15 * 1000, message, iter + 1);
-            return;
-        }
-
-        try
-        {
-            this.sendDmTo(player, message);
-        }
-        catch (e)
-        {
-            console.error(e);
-        }
-    }
+    // async remindPlayer(player, timeMs, message, iter=0)
+    // {
+    //     // if (iter > 10) return;
+    //
+    //     // if (timeMs < 1000) return;
+    //     await Utils.sleep(timeMs);
+    //     // if (!this.bot)
+    //     // {
+    //     //     await this.remindPlayer(player, 15 * 1000, message, iter + 1);
+    //     //     return;
+    //     // }
+    //
+    //     try
+    //     {
+    //         this.sendDmTo(player, message);
+    //     }
+    //     catch (e)
+    //     {
+    //         console.error(e);
+    //     }
+    // }
 
     sendDmTo(player, msg)
     {
@@ -179,11 +179,11 @@ class MineflayerHandler
                 const time = Utils.parseTimeNotation(words.shift());
                 const reminder = words.join(" ");
                 const englishTime = Utils.msToEnglishTime(time);
+                const message = `i will remind you about ${reminder} in ${englishTime}.`;
 
-                this.sendDmTo(player, `i will remind you about ${reminder} in ${englishTime}.`)
+                setTimeout(this.sendDmTo.bind(this), time, player, message)
                 console.log(`i will remind you about ${reminder} in ${englishTime}. (for ${player})`)
 
-                this.remindPlayer(player, time, reminder);
                 break;
             }
             case "s":
@@ -271,6 +271,22 @@ class MineflayerHandler
             {
                 if (this.bot === null) return;
                 this.bot.chat("/g mute rjl_ 1m");
+                break;
+            }
+            case "!rm":
+            case "!remindme":
+            case "!reminder":
+            {
+                words.shift();
+                const time = Utils.parseTimeNotation(words.shift());
+                const reminder = words.join(" ");
+                const englishTime = Utils.msToEnglishTime(time);
+                const message = `i will remind you about ${reminder} in ${englishTime}.`;
+
+                setTimeout(this.sendToGc.bind(this), time, message)
+                console.log(`i will remind you about ${reminder} in ${englishTime}. (for ${name})`)
+
+                break;
             }
         }
     }
