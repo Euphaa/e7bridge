@@ -1,63 +1,83 @@
 import Utils from "./Utils.js";
 import mineflayer from "mineflayer";
-import Index from "./Index.js";
-import fs from "fs";
+import Main from "./Main.js";
 
-
-class MineflayerHandler
+export default class MineflayerHandler
 {
     bot;
     OPTIONS;
     currentMessageType;
-    messageBuffer;
+    messageBuffer = [];
     onlineMembers;
+    commandQueue = [];
 
-    constructor()
+    constructor(options)
     {
-        this.OPTIONS = Index.CONFIG.mineflayer;
+        options.auth = "microsoft";
+        this.OPTIONS = options;
         this.bot = mineflayer.createBot(this.OPTIONS);
         this.bot.on("end", this._handleMinecraftDisconnect.bind(this));
         this.bot.on("message", this._handleMinecraftMsg.bind(this));
-        this.messageBuffer = [];
-        setTimeout(this.sendLimbo.bind(this), 10_000);
+        setTimeout(this.sendLimbo.bind(this), 5_000);
         setInterval(this.sendLimbo.bind(this), 60_000);
+        setInterval(this._shiftCommandQueue.bind(this), 500)
+    }
+
+    _shiftCommandQueue()
+    {
+        if (this.commandQueue.length < 1) return;
+        let command = this.commandQueue.shift();
+        if (command === null || typeof command !== typeof "" || this.bot === null) return;
+
+        this.bot.chat(command);
     }
 
     sendLimbo()
     {
-        if (!this.bot) return;
-        this.bot.chat('/limbo')
+        this.commandQueue.push("/limbo")
     }
 
     sendToGc(msg)
     {
-        if (this.bot === null) return;
-        if (msg.length > 255) msg = msg.slice(0, 255);
-        this.bot.chat("/gc " + msg);
+        if (msg.length > 120) msg = msg.slice(0, 120);
+        // console.log(`sending to gc: ${msg}`)
+
+        this.commandQueue.push("/gc " + msg)
     }
 
-    async remindPlayer(player, timeMs, message, iter=0)
+    sendToGcWithRandomString(msg)
     {
-        if (iter > 10) return;
-        if (timeMs < 1000) return;
-        await Utils.sleep(timeMs);
-        if (!this.bot)
-        {
-            await this.remindPlayer(player, 15 * 1000, message, iter + 1);
-            return;
-        }
-
-        try
-        {
-            this.bot.chat(`/msg ${player} ${message}`);
-        }
-        catch (e)
-        {
-            console.error(e);
-        }
+        this.sendToGc(msg + ` <${Math.random().toString(36).slice(2, 5)}>`);
     }
 
-    async getOnlineMembers(retrys=100)
+    // async remindPlayer(player, timeMs, message, iter=0)
+    // {
+    //     // if (iter > 10) return;
+    //
+    //     // if (timeMs < 1000) return;
+    //     await Utils.sleep(timeMs);
+    //     // if (!this.bot)
+    //     // {
+    //     //     await this.remindPlayer(player, 15 * 1000, message, iter + 1);
+    //     //     return;
+    //     // }
+    //
+    //     try
+    //     {
+    //         this.sendDmTo(player, message);
+    //     }
+    //     catch (e)
+    //     {
+    //         console.error(e);
+    //     }
+    // }
+
+    sendDmTo(player, msg)
+    {
+        this.commandQueue.push(`/msg ${player} ${msg}`)
+    }
+
+    async getOnlineMembers(retrys=40)
     {
         while (!this.onlineMembers && retrys > 0)
         {
@@ -71,104 +91,205 @@ class MineflayerHandler
 
     async _handleMinecraftDisconnect()
     {
-        Index.discordHandler.sendEmbed("Bot Disconnected", 0xd12121);
-        await Utils.sleep(10_000);
-        this.bot = mineflayer.createBot(this.OPTIONS);
-        Index.discordHandler.sendEmbed("Bot Connected!", 0x21d127);
+        Main.discordHandler.sendEmbed("Bot Disconnected", 0xd12121);
+        process.exit(1);
     }
 
     _handleMinecraftMsg(jsonMsg, position, sender, verified)
     {
         let msg = jsonMsg.toString();
 
-        /* handle all chat and commands */
-        if (this.currentMessageType)
+
+        const guildRegex = /Guild > (?:\[(.*?)\] )?([A-Za-z0-9_]+)(?:\[(.*?)\])?: (.+)/
+        let result = msg.match(guildRegex);
+        if (result !== null)
         {
-            if (this.currentMessageType === 'unknown')
+            console.log(result)
+            this.handleGuildChat(result[1], result[2], result[3], result[4]);
+            return;
+        }
+
+        const dmRegex = /From (?:\[(.*?)\] )?([A-Za-z0-9_]+): (.+)/;
+        result = msg.match(dmRegex);
+        if (result !== null)
+        {
+            console.log(result)
+            this.handleDirectMessage(result[1], result[2], result[3])
+            return;
+        }
+
+        console.log(msg);
+
+        const pinvRegex = /^[-]+\n(?:\[(.*?)\] )?([A-Za-z0-9_]+) has invited you to join their party!\nYou have 60 seconds to accept\. Click here to join!\n[-]+$/
+        result = msg.match(pinvRegex);
+        if (result !== null && Math.random() > .85)
+        {
+            console.log(result)
+            this.commandQueue.push(`/p join ${result[2]}`);
+            this.commandQueue.push("/pc ♿");
+            this.commandQueue.push("/p leave");
+        }
+
+
+        /* handle all chat */
+
+        if (msg === '-----------------------------------------------------'
+            || msg === "--------------  Guild: Message Of The Day  --------------")
+        {
+            // console.log(`|| ${this.messageBuffer.join("\n|| ")}`)
+            if (this.messageBuffer.length < 1) return;
+
+            if (this.messageBuffer[0].startsWith("Guild Name: "))
             {
-                this.currentMessageType = this.getMessageType(msg);
+                this.onlineMembers = this.messageBuffer.join("\n");
             }
-            this.messageBuffer.push(msg);
-            if (msg === '-----------------------------------------------------')
+
+            if (this.messageBuffer[0].includes("joined the guild!")
+                || this.messageBuffer[0].includes(" has unmuted "))
             {
-                switch (this.currentMessageType)
-                {
-                    case 'g online': this.onlineMembers = this.messageBuffer.join('\n');
-                    default: {
-                        this.currentMessageType = null;
-                        this.messageBuffer = [];
-                    }
-                }
+                Main.discordHandler.sendEmbed(
+                    '-----------------------------------------------------\n'
+                    + this.messageBuffer[0]
+                    + '\n-----------------------------------------------------',
+                    0x21d127
+                );
             }
-        }
-        else if (msg === '-----------------------------------------------------')
-        {
-            this.currentMessageType = 'unknown';
-            this.messageBuffer.push(msg);
-            return;
-        }
-        else if (msg === '--------------  Guild: Message Of The Day  --------------')
-        {
-            this.currentMessageType = 'motd';
-            this.messageBuffer.push(msg);
-            return;
-        }
 
-        /* handle direct messages */
-
-        let words = msg.split(' ');
-        if (msg.startsWith('From '))
-        {
-            words.shift();
-            if (words[0].startsWith("[")) words.shift(); // get rid of hypixel rank
-            words[0] = words[0].slice(0, -1);
-
-            switch (words.splice(1, 1)[0].toLowerCase())
+            if (this.messageBuffer[0].includes("was kicked from the guild")
+                || this.messageBuffer[0].includes("has muted")
+                || this.messageBuffer[0].includes("left the guild!"))
             {
-                case 'rm':
-                case 'remindme':
-                {
-                    console.log('setting up reminder')
-                    this.remindPlayer(words.shift(), Utils.parseTimeNotation(words.shift()), words.join(' '));
-                    break;
-                }
+                Main.discordHandler.sendEmbed(
+                    '-----------------------------------------------------\n'
+                    + this.messageBuffer[0]
+                    + '\n-----------------------------------------------------',
+                    0xd12121
+                );
             }
+
+            this.messageBuffer = [];
             return;
         }
 
-        /* handle guild chat */
-
-        if (typeof msg !== "string" || !msg.startsWith("Guild > "))
-        {
-            return;
-        }
-
-        words.shift(); // get rid of "Guild > "
-        words.shift(); // get rid of "Guild > "
-        if (words[0].startsWith("[")) words.shift(); // get rid of hypixel rank
-        if (words[0] === this.bot.username) return; // ignore msgs sent by us
-        if (words[1].startsWith('[')) // get rid of guild rank
-        {
-            words[0] = words[0] + ':';
-            words.splice(1, 1);
-        }
-        if (!words[0].endsWith(':')) // this is a msg not sent by a player
-        {
-            Index.discordHandler.sendEmbed(words.join(' '), (words[1].includes('left')) ? 0xd12121 : 0x21d127);
-            return;
-        }
-        words[0] = words[0].slice(0, -1); // removes the colon from the name
-
-        // placeMentions(words);
-
-        Index.discordHandler.sendWebhookMessage(words.shift(), words.join(" "));
+        this.messageBuffer.push(msg);
+        // console.log((this.messageBuffer.join("\n")))
     }
 
-    getMessageType(msg)
+    handleDirectMessage(rank, name, msg)
     {
-        if (msg.startsWith('Guild Name:')) return "g online";
-        return 'unknown'
+        // let words = msg.split(" ");
+        //
+        // switch (words[0].toLowerCase())
+        // {
+        //     // words at this point should follow [ign, word, word, ...word]
+        //     case 'rm':
+        //     case 'remindme':
+        //     {
+        //         const player = words.shift();
+        //         const time = Utils.parseTimeNotation(words.shift());
+        //         const reminder = words.join(" ");
+        //         const englishTime = Utils.msToEnglishTime(time);
+        //         const message = `i will remind you about ${reminder} in ${englishTime}.`;
+        //
+        //         setTimeout(this.sendDmTo.bind(this), time, player, message)
+        //         console.log(`i will remind you about ${reminder} in ${englishTime}. (for ${player})`)
+        //
+        //         break;
+        //     }
+        //     case "s":
+        //     case "sub":
+        //     case "subscribe":
+        //     {
+        //         Main.scheduler.parsePlayerRequest(words)
+        //     }
+        // }
     }
 
+    handleGuildChat(rank, name, guildTag, msg)
+    {
+        let words = msg.split(" ");
+        if (name === this.bot.username) return;
+
+        /* i have no idea why this is here */
+        // if (!words[0].endsWith(':')) // this is a msg not sent by a player
+        // {
+        //     Main.discordHandler.sendEmbed(words.join(' '), (words[1].includes('left')) ? 0xd12121 : 0x21d127);
+        //     return;
+        // }
+
+        Main.discordHandler.sendWebhookMessage(name, words.join(" "));
+
+        if (words[0].startsWith("!"))
+        {
+            this.parseGuildCommand(name, words);
+        }
+    }
+
+    parseGuildCommand(name, words)
+    {
+        switch (words[0].toLowerCase())
+        {
+            case "!r":
+            case "!roll":
+            {
+                let maxRoll = 6;
+                if (words.length > 1) maxRoll = parseInt(words[1].slice(0, 99));
+                const roll = 1 + Math.floor(Math.random() * maxRoll);
+                let msg = `${name} rolled ${roll}`;
+
+                this.sendToGcWithRandomString(msg);
+                Main.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
+                break;
+            }
+            case "!gay":
+            {
+                let roll = Math.floor(Math.random() * 101);
+                if (name === "_brent_") roll = 100;
+                if (name === "MissEepy") roll = 101;
+                const msg = `${name} is ${roll}% gay`;
+                this.sendToGcWithRandomString(msg);
+                Main.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
+                break;
+            }
+            case "!cf":
+            case "!flip":
+            case "!coinflip":
+            {
+                const msg = `${name} flipped a coin and got ${Math.random() < .5 ? "heads" : "tails"}!`;
+                this.sendToGcWithRandomString(msg);
+                Main.discordHandler.sendWebhookMessage(this.bot.username,  msg, false);
+                break;
+            }
+            case "!muterjl_":
+            case "!muterjl":
+            {
+                if (this.bot === null) return;
+                this.bot.chat("/g mute rjl_ 1m");
+                break;
+            }
+            case "!rm":
+            case "!remindme":
+            case "!reminder":
+            {
+                const errorMsg = "incorrect usage <time> <reminder>; example usage: !rm 1h30m divorce my ex wife again";
+                const time = Utils.parseTimeNotation(words[1]);
+                if (!(time instanceof Number))
+                {
+                    Main.discordHandler.sendWebhookMessage("SLTGC", this.bot.username, false);
+                    this.sendToGc(errorMsg);
+                }
+
+                const reminder = words.subarray(2, words.length).join();
+                const englishTime = Utils.msToEnglishTime(time);
+                let message = `i will remind you about ${reminder} in ${englishTime}.`;
+                if (reminder.length < 1) message = `i will remind you in ${englishTime}`;
+
+                setTimeout(this.sendToGc.bind(this), time, "reminder requested by " + name + ": " + reminder);
+                Main.discordHandler.sendWebhookMessage(message, this.bot.username, false);
+                this.sendToGc(message);
+
+                break;
+            }
+        }
+    }
 }
-export default MineflayerHandler;

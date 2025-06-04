@@ -1,13 +1,14 @@
 import Utils from "./Utils.js";
-import Index from "./Index.js";
+import Main from "./Main.js";
 import * as path from "node:path";
 import { Client as DiscordClient, Events, GatewayIntentBits, SlashCommandBuilder, Collection, Routes, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import fs from 'fs';
 import pathToFileURL from "url";
+import MineflayerHandler from "./MineflayerHandler.js";
 
 
-class DiscordHandler
+export default class DiscordHandler
 {
     static commands = new Collection();
     discord;
@@ -17,15 +18,15 @@ class DiscordHandler
     webhook;
     OPTIONS;
 
-    constructor()
+    constructor(options)
     {
         this.discord = new DiscordClient({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
+        this.OPTIONS = options;
 
     }
 
     async init()
     {
-        this.OPTIONS = Index.CONFIG.discord;
         this.discord.login(this.OPTIONS.token);
         this.discord.once(Events.ClientReady, this._onReady.bind(this));
         this.discord.on(Events.MessageCreate, this._handleDiscordMessage.bind(this));
@@ -63,6 +64,7 @@ class DiscordHandler
 
     sendMessageWithoutWebhook(msg)
     {
+        if (msg.length < 1) return;
         this.channel.send(msg)
     }
 
@@ -133,7 +135,6 @@ class DiscordHandler
         try {
             console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-            // The put method is used to fully refresh all commands in the guild with the current set
             const data = await rest.put(
                 Routes.applicationGuildCommands(this.discord.id, this.guild.id),
                 {body: commands},
@@ -143,7 +144,6 @@ class DiscordHandler
         }
         catch (error)
         {
-            // And of course, make sure you catch and log any errors!
             console.error(error);
         }
 
@@ -162,7 +162,7 @@ class DiscordHandler
         {
             console.log("making new Webhook...");
             this.channel.createWebhook({
-                name: Index.mineflayerHandler.bot.username,
+                name: Main.mineflayerHandler.bot.username,
                 avatar: guildAvatar,
                 channel: this.OPTIONS.channelID
             }).then(w => this.webhook = w);
@@ -195,14 +195,15 @@ class DiscordHandler
             if (replyingTo) name = `${name} ↷ ${replyingTo}`;
             if (message.attachments.size < 1)
             {
-                Index.mineflayerHandler.sendToGc(`${name}: ${this.replaceMentions(message.content)}`);
+                Main.mineflayerHandler.sendToGc(`${name}: ${this.replaceMentions(message.content)}`);
                 console.log(`Discord Chat > ${name}: ${message.content}`);
             }
             else
             {
-                Index.mineflayerHandler.sendToGc(`${name}: ${this.replaceMentions("[sent file] " + message.content)}`);
+                Main.mineflayerHandler.sendToGc(`${name}: ${this.replaceMentions("[sent file] " + message.content)}`);
                 console.log(`Discord Chat > ${name}: ${"[sent file] " + message.content}`);
             }
+            if (message.content.startsWith("!")) Main.mineflayerHandler.parseGuildCommand(name, message.content.split(" "));
         });
     }
 
@@ -237,7 +238,7 @@ class DiscordHandler
         if (message.webhookId) return false;
         if (message.system) return false;
         if (message.embeds && message.embeds.length > 0) return false;
-        if (message.content === '') return false;
+        // if (message.content === '') return false;
 
         return true;
     }
@@ -258,4 +259,3 @@ class DiscordHandler
         }
     }
 }
-export default DiscordHandler;

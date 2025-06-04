@@ -1,4 +1,4 @@
-import Index from "../Index.js";
+import Main from "../Main.js";
 import DiscordHandler from "../DiscordHandler.js";
 
 class OnlineCommand
@@ -11,8 +11,8 @@ class OnlineCommand
 
     async execute(interaction)
     {
-        Index.mineflayerHandler.bot.chat('/g online');
-        let members = await Index.mineflayerHandler.getOnlineMembers();
+        Main.mineflayerHandler.bot.chat('/g online');
+        let members = await Main.mineflayerHandler.getOnlineMembers();
 
         if (!members)
         {
