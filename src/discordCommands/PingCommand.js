@@ -1,14 +1,11 @@
-class PingCommand
-{
-    constructor()
-    {
-        this.name = 'ping';
-        this.description = 'Pong!';
-    }
+import { SlashCommandBuilder } from 'discord.js';
 
-    async execute(interaction)
-    {
-        interaction.reply('Pong!');
+export default {
+    data: new SlashCommandBuilder()
+        .setName('ping')
+        .setDescription('Replies with Pong!'),
+
+    async execute(interaction) {
+        await interaction.reply('Pong!');
     }
-}
-export default PingCommand;
+};

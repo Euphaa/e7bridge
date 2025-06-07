@@ -10,6 +10,7 @@ export default class MineflayerHandler
     messageBuffer = [];
     onlineMembers;
     commandQueue = [];
+    previousCommand;
 
     constructor(options)
     {
@@ -29,7 +30,17 @@ export default class MineflayerHandler
         let command = this.commandQueue.shift();
         if (command === null || typeof command !== typeof "" || this.bot === null) return;
 
+        command = this.sanitize(command);
+        console.warn(`sending command: ${command}`);
+        this.previousCommand = command;
         this.bot.chat(command);
+    }
+
+    sanitize(command)
+    {
+        command = command.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '***.***.***.***');
+        command = command.replace(/[^*\s]+[.,][^*\s]+/g, "****");
+        return command;
     }
 
     sendLimbo()
@@ -99,80 +110,141 @@ export default class MineflayerHandler
     {
         let msg = jsonMsg.toString();
 
-
-        const guildRegex = /Guild > (?:\[(.*?)\] )?([A-Za-z0-9_]+)(?:\[(.*?)\])?: (.+)/
-        let result = msg.match(guildRegex);
-        if (result !== null)
-        {
-            console.log(result)
-            this.handleGuildChat(result[1], result[2], result[3], result[4]);
-            return;
-        }
-
-        const dmRegex = /From (?:\[(.*?)\] )?([A-Za-z0-9_]+): (.+)/;
-        result = msg.match(dmRegex);
-        if (result !== null)
-        {
-            console.log(result)
-            this.handleDirectMessage(result[1], result[2], result[3])
-            return;
-        }
-
-        console.log(msg);
-
-        const pinvRegex = /^[-]+\n(?:\[(.*?)\] )?([A-Za-z0-9_]+) has invited you to join their party!\nYou have 60 seconds to accept\. Click here to join!\n[-]+$/
-        result = msg.match(pinvRegex);
-        if (result !== null && Math.random() > .85)
-        {
-            console.log(result)
-            this.commandQueue.push(`/p join ${result[2]}`);
-            this.commandQueue.push("/pc ♿");
-            this.commandQueue.push("/p leave");
-        }
-
-
-        /* handle all chat */
-
-        if (msg === '-----------------------------------------------------'
-            || msg === "--------------  Guild: Message Of The Day  --------------")
-        {
-            // console.log(`|| ${this.messageBuffer.join("\n|| ")}`)
-            if (this.messageBuffer.length < 1) return;
-
-            if (this.messageBuffer[0].startsWith("Guild Name: "))
+        const patternHandlers = [
             {
-                this.onlineMembers = this.messageBuffer.join("\n");
-            }
+                pattern: /Guild > (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])?: (?<message>.+)/,
+                handler: (groups) => {
+                    if (groups.name === this.bot.username) return;
 
-            if (this.messageBuffer[0].includes("joined the guild!")
-                || this.messageBuffer[0].includes(" has unmuted "))
+                    Main.discordHandler.sendWebhookMessage(groups.name, groups.message);
+                    if (groups.message.startsWith("!"))
+                        this.parseGuildCommand(groups.name, groups.message);
+                }
+            },
             {
-                Main.discordHandler.sendEmbed(
-                    '-----------------------------------------------------\n'
-                    + this.messageBuffer[0]
-                    + '\n-----------------------------------------------------',
-                    0x21d127
-                );
-            }
-
-            if (this.messageBuffer[0].includes("was kicked from the guild")
-                || this.messageBuffer[0].includes("has muted")
-                || this.messageBuffer[0].includes("left the guild!"))
+                pattern: /^Guild > (?<name>[A-Za-z0-9_]+) (?<action>joined|left)\.$/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        `${groups.name} ${groups.action}.`,
+                        groups.action === "left" ? 0xd12121 : 0x21d127
+                    );
+                }
+            },
             {
-                Main.discordHandler.sendEmbed(
-                    '-----------------------------------------------------\n'
-                    + this.messageBuffer[0]
-                    + '\n-----------------------------------------------------',
-                    0xd12121
-                );
-            }
+                pattern: /From (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+): (?<message>.+)/,
+                handler: (groups) => {
+                    this.handleDirectMessage(groups.rank, groups.name, groups.message);
+                }
+            },
+            {
+                pattern: /^[-]+\n(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+) has invited you to join their party!\nYou have 60 seconds to accept\. Click here to join!\n[-]+$/,
+                handler: (groups) => {
+                    if (Math.random() > 0.85) {
+                        this.commandQueue.push(`/p join ${groups.name}`);
+                        this.commandQueue.push("/pc ♿");
+                        this.commandQueue.push("/p leave");
+                    }
+                }
+            },
+            {
+                /* this message signifies the start or end of some info block, so we search for any info we need here. */
+                pattern: /-----------------------------------------------------/,
+                handler: (groups) => {
+                    if (this.messageBuffer.length < 1) return;
 
-            this.messageBuffer = [];
-            return;
+                    if (this.messageBuffer[0].startsWith("Guild Name: "))
+                    {
+                        this.onlineMembers = this.messageBuffer.join("\n");
+                    }
+
+                    this.messageBuffer = [];
+                }
+            },
+            {
+                /* gotta reset here otherwise the following hyphen pattern will update old info */
+                pattern: /--------------  Guild: Message Of The Day  --------------/,
+                handler: (groups) => {
+                    this.messageBuffer = [];
+                }
+            },
+            {
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])? has muted (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?:\[(?<victimTag>.*?)\])? for (?<duration>.+)/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0xd12121
+                    );
+                }
+            },
+            {
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+) joined the guild!/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0x21d127
+                    );
+                }
+            },
+            {
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])? has muted (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?:\[(?<victimTag>.*?)\])?/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0x21d127
+                    );
+                }
+            },
+            {
+                pattern: /(?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?:\[(?<victimTag>.*?)\])? was kicked from the guild by (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])?!/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0xd12121
+                    );
+                }
+            },
+            {
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])? left the guild!/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0xd12121
+                    );
+                }
+            },
+            {
+                pattern: /Advertising is against the rules. You will receive a punishment on the server if you attempt to advertise./,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(`:warning::warning::warning::warning::warning:\nreceived warning for advertising:\n${this.previousCommand}\n:warning::warning::warning::warning::warning:`, 0xd12121);
+                }
+            }
+        ];
+
+        for (const { pattern, handler } of patternHandlers)
+        {
+            const match = msg.match(pattern);
+            if (match !== null)
+            {
+                handler(match.groups);
+                console.log(msg);
+
+                return;
+            }
         }
 
+
+        console.log(msg.replace(/[\r\n]+/g, ""));
         this.messageBuffer.push(msg);
-        // console.log((this.messageBuffer.join("\n")))
     }
 
     handleDirectMessage(rank, name, msg)
@@ -205,28 +277,9 @@ export default class MineflayerHandler
         // }
     }
 
-    handleGuildChat(rank, name, guildTag, msg)
+    parseGuildCommand(name, message)
     {
-        let words = msg.split(" ");
-        if (name === this.bot.username) return;
-
-        /* i have no idea why this is here */
-        // if (!words[0].endsWith(':')) // this is a msg not sent by a player
-        // {
-        //     Main.discordHandler.sendEmbed(words.join(' '), (words[1].includes('left')) ? 0xd12121 : 0x21d127);
-        //     return;
-        // }
-
-        Main.discordHandler.sendWebhookMessage(name, words.join(" "));
-
-        if (words[0].startsWith("!"))
-        {
-            this.parseGuildCommand(name, words);
-        }
-    }
-
-    parseGuildCommand(name, words)
-    {
+        let words = message.split(" ");
         switch (words[0].toLowerCase())
         {
             case "!r":
@@ -271,21 +324,32 @@ export default class MineflayerHandler
             case "!remindme":
             case "!reminder":
             {
-                const errorMsg = "incorrect usage <time> <reminder>; example usage: !rm 1h30m divorce my ex wife again";
+                const errorMsg = "incorrect usage <time> <reminder>; example usage: !rm 1h30m divorce my wife again";
                 const time = Utils.parseTimeNotation(words[1]);
-                if (!(time instanceof Number))
+                if (time < 1000)
                 {
-                    Main.discordHandler.sendWebhookMessage("SLTGC", this.bot.username, false);
+                    Main.discordHandler.sendWebhookMessage(this.bot.username, errorMsg, false);
                     this.sendToGc(errorMsg);
+                    return;
                 }
 
-                const reminder = words.subarray(2, words.length).join();
+                words.shift();
+                words.shift();
+
+                const reminder = words.join(" ");
                 const englishTime = Utils.msToEnglishTime(time);
-                let message = `i will remind you about ${reminder} in ${englishTime}.`;
+                let message = `i will remind you in ${englishTime}.`;
                 if (reminder.length < 1) message = `i will remind you in ${englishTime}`;
 
-                setTimeout(this.sendToGc.bind(this), time, "reminder requested by " + name + ": " + reminder);
-                Main.discordHandler.sendWebhookMessage(message, this.bot.username, false);
+                setTimeout(
+                    (s) => {
+                        this.sendToGc(s);
+                        Main.discordHandler.sendWebhookMessage(this.bot.username, s, false);
+                    },
+                    time,
+                    `reminder requested by ${name}: ${reminder}`
+                );
+                Main.discordHandler.sendWebhookMessage(this.bot.username, message, false);
                 this.sendToGc(message);
 
                 break;

@@ -1,6 +1,5 @@
 import DiscordHandler from "./DiscordHandler.js";
 import MineflayerHandler from "./MineflayerHandler.js";
-import fs from "fs";
 import Scheduler from "./Scheduler.js";
 import config from "../config.json" with { type: "json" };
 
@@ -30,7 +29,6 @@ process.on("SIGINT", () => {
 });
 
 process.on('uncaughtException', error => {
-    // Main.mineflayerHandler.bot.quit();
     console.error(error);
     Main.discordHandler.sendMessageWithoutWebhook(`<@${Main.discordHandler.OPTIONS.ownerId}> bot is down ): [SIGINT]`);
     setTimeout(() => {

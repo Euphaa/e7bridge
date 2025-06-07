@@ -1,11 +1,10 @@
 import Utils from "./Utils.js";
 import Main from "./Main.js";
 import * as path from "node:path";
-import { Client as DiscordClient, Events, GatewayIntentBits, SlashCommandBuilder, Collection, Routes, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { Client as DiscordClient, Events, GatewayIntentBits, Collection, Routes, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { REST } from '@discordjs/rest';
 import fs from 'fs';
 import pathToFileURL from "url";
-import MineflayerHandler from "./MineflayerHandler.js";
 
 
 export default class DiscordHandler
@@ -22,16 +21,20 @@ export default class DiscordHandler
     {
         this.discord = new DiscordClient({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
         this.OPTIONS = options;
-
     }
 
     async init()
     {
-        this.discord.login(this.OPTIONS.token);
         this.discord.once(Events.ClientReady, this._onReady.bind(this));
         this.discord.on(Events.MessageCreate, this._handleDiscordMessage.bind(this));
         this.discord.on(Events.InteractionCreate, this._handleUnknownCommand.bind(this));
+
+        await this.discord.login(this.OPTIONS.token);
+        this.guild = await this.discord.guilds.fetch(this.OPTIONS.guildId);
         await this.loadCommands();
+
+
+        await this.registerCommandsWithServer();
         return this;
     }
 
@@ -59,7 +62,6 @@ export default class DiscordHandler
             username: name,
             avatarURL: iconToUse
         });
-        console.log(`Guild Chat > ${name}: ${msg}`)
     }
 
     sendMessageWithoutWebhook(msg)
@@ -110,10 +112,9 @@ export default class DiscordHandler
                 const commandUrl = pathToFileURL.pathToFileURL(commandPath).href;
 
                 console.log('Importing:', commandUrl);
-                const CommandClass = (await import(commandUrl)).default;
+                const command = (await import(commandUrl)).default;
 
-                const commandInstance = new CommandClass();
-                DiscordHandler.commands.set(commandInstance.name, commandInstance);
+                DiscordHandler.commands.set(command.data.name, command);
             }
             catch (error)
             {
@@ -125,28 +126,28 @@ export default class DiscordHandler
     async registerCommandsWithServer()
     {
         const commands = [];
+        const rest = new REST().setToken(this.OPTIONS.token);
+
+
         for (const command of DiscordHandler.commands.values())
         {
+            if (!command || !command.data || typeof command.data.toJSON !== 'function') {
+                console.warn("Malformed command:", command);
+                console.log(command)
+            }
             commands.push(command.data.toJSON());
         }
 
-        const rest = new REST().setToken(this.OPTIONS.token);
+        console.log(`Started refreshing ${commands.length} application (/) commands.`);
+        const serverId = this.OPTIONS.serverID;
+        console.log(`Guild ID: ${serverId}`);
 
-        try {
-            console.log(`Started refreshing ${commands.length} application (/) commands.`);
+        const data = await rest.put(
+            Routes.applicationGuildCommands(this.discord.application.id, serverId),
+            {body: commands},
+        );
 
-            const data = await rest.put(
-                Routes.applicationGuildCommands(this.discord.id, this.guild.id),
-                {body: commands},
-            );
-
-            console.log(`Successfully reloaded ${data.length} application (/) commands.`);
-        }
-        catch (error)
-        {
-            console.error(error);
-        }
-
+        console.log(`Successfully reloaded ${data.length} application (/) commands.`);
     }
 
     async _onReady(readyClient)
@@ -162,8 +163,8 @@ export default class DiscordHandler
         {
             console.log("making new Webhook...");
             this.channel.createWebhook({
-                name: Main.mineflayerHandler.bot.username,
-                avatar: guildAvatar,
+                name: "GuildBridge",
+                avatar: this.guildAvatar,
                 channel: this.OPTIONS.channelID
             }).then(w => this.webhook = w);
         }
@@ -175,10 +176,10 @@ export default class DiscordHandler
     static generateMessageWithEmbed(msg, color)
     {
         return {
-             embeds: [new EmbedBuilder()
-                    .setColor(color)
-                    .setDescription(Utils.escapeDiscordMarkdown(msg))
-             ]
+            embeds: [new EmbedBuilder()
+                .setColor(color)
+                .setDescription(Utils.escapeDiscordMarkdown(msg))
+            ]
         }
     }
 
@@ -203,7 +204,7 @@ export default class DiscordHandler
                 Main.mineflayerHandler.sendToGc(`${name}: ${this.replaceMentions("[sent file] " + message.content)}`);
                 console.log(`Discord Chat > ${name}: ${"[sent file] " + message.content}`);
             }
-            if (message.content.startsWith("!")) Main.mineflayerHandler.parseGuildCommand(name, message.content.split(" "));
+            if (message.content.startsWith("!")) Main.mineflayerHandler.parseGuildCommand(name, message.content);
         });
     }
 
