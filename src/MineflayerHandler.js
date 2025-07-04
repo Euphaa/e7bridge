@@ -112,7 +112,7 @@ export default class MineflayerHandler
 
         const patternHandlers = [
             {
-                pattern: /Guild > (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])?: (?<message>.+)/,
+                pattern: /Guild > (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?: \[(?<tag>.*?)\])?: (?<message>.+)/,
                 handler: (groups) => {
                     if (groups.name === this.bot.username) return;
 
@@ -139,7 +139,9 @@ export default class MineflayerHandler
             {
                 pattern: /^[-]+\n(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+) has invited you to join their party!\nYou have 60 seconds to accept\. Click here to join!\n[-]+$/,
                 handler: (groups) => {
-                    if (Math.random() > 0.85) {
+                    let roll = Math.random();
+                    console.log(roll);
+                    if (roll > 0.85) {
                         this.commandQueue.push(`/p join ${groups.name}`);
                         this.commandQueue.push("/pc ♿");
                         this.commandQueue.push("/p leave");
@@ -168,7 +170,7 @@ export default class MineflayerHandler
                 }
             },
             {
-                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])? has muted (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?:\[(?<victimTag>.*?)\])? for (?<duration>.+)/,
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?: \[(?<tag>.*?)\])? has muted (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?: \[(?<victimTag>.*?)\])? for (?<duration>.+)/,
                 handler: (groups) => {
                     Main.discordHandler.sendEmbed(
                         '-----------------------------------------------------\n'
@@ -190,7 +192,7 @@ export default class MineflayerHandler
                 }
             },
             {
-                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])? has muted (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?:\[(?<victimTag>.*?)\])?/,
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?: \[(?<tag>.*?)\])? has muted (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?: \[(?<victimTag>.*?)\])?/,
                 handler: (groups) => {
                     Main.discordHandler.sendEmbed(
                         '-----------------------------------------------------\n'
@@ -201,7 +203,7 @@ export default class MineflayerHandler
                 }
             },
             {
-                pattern: /(?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?:\[(?<victimTag>.*?)\])? was kicked from the guild by (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])?!/,
+                pattern: /(?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?: \[(?<victimTag>.*?)\])? was kicked from the guild by (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?: \[(?<tag>.*?)\])?!/,
                 handler: (groups) => {
                     Main.discordHandler.sendEmbed(
                         '-----------------------------------------------------\n'
@@ -212,7 +214,7 @@ export default class MineflayerHandler
                 }
             },
             {
-                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?:\[(?<tag>.*?)\])? left the guild!/,
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?: \[(?<tag>.*?)\])? left the guild!/,
                 handler: (groups) => {
                     Main.discordHandler.sendEmbed(
                         '-----------------------------------------------------\n'
@@ -227,6 +229,17 @@ export default class MineflayerHandler
                 handler: (groups) => {
                     Main.discordHandler.sendEmbed(`:warning::warning::warning::warning::warning:\nreceived warning for advertising:\n${this.previousCommand}\n:warning::warning::warning::warning::warning:`, 0xd12121);
                 }
+            },
+            {
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?: \[(?<tag>.*?)\])? transferred Guild Master rank to (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?: \[(?<victimTag>.*?)\])?/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0xd12121
+                    );
+                }
             }
         ];
 
@@ -236,12 +249,25 @@ export default class MineflayerHandler
             if (match !== null)
             {
                 handler(match.groups);
-                console.log(msg);
+                console.log("# " + msg.replace(/[\r\n]+/g, "\n# "));
 
                 return;
             }
         }
 
+        const ignoredPatterns = [
+            /The lobby you attempted to join was full or offline\./,
+            /Because of this, you were routed to Limbo, a subset of your own imagination\./,
+            /This place doesn't exist anywhere, and you can stay here as long as you'd like\./,
+            /To return to "reality", use \/lobby GAME\./,
+            /Examples: \/lobby, \/lobby skywars, \/lobby arcade/,
+            /Watch out, though, as there are things that live in Limbo\./
+        ];
+
+        for (const pattern of ignoredPatterns)
+        {
+            if (msg.match(pattern) !== null) return;
+        }
 
         console.log(msg.replace(/[\r\n]+/g, ""));
         this.messageBuffer.push(msg);
