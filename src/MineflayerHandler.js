@@ -1,6 +1,7 @@
 import Utils from "./Utils.js";
 import mineflayer from "mineflayer";
 import Main from "./Main.js";
+import DiscordHandler from "./DiscordHandler.js";
 
 export default class MineflayerHandler
 {
@@ -14,19 +15,25 @@ export default class MineflayerHandler
 
     constructor(options)
     {
+        setInterval(() => {}, 100000000);
         options.auth = "microsoft";
         this.OPTIONS = options;
         this.bot = mineflayer.createBot(this.OPTIONS);
-        this.bot.on("end", this._handleMinecraftDisconnect.bind(this));
-        this.bot.on("message", this._handleMinecraftMsg.bind(this));
-        setTimeout(this.sendLimbo.bind(this), 5_000);
-        setInterval(this.sendLimbo.bind(this), 60_000);
-        setInterval(this._shiftCommandQueue.bind(this), 500)
+        this.bot.once("spawn", () => {
+            this.bot.on("end", this._handleMinecraftDisconnect.bind(this));
+            this.bot.on("kicked", this._handleMinecraftDisconnect.bind(this));
+            this.bot.on("message", this._handleMinecraftMsg.bind(this));
+            this.sendLimbo();
+            setInterval(this.sendLimbo.bind(this), 60_000);
+            setInterval(this._shiftCommandQueue.bind(this), 500);
+            Main.discordHandler.sendEmbed("Bot Connected!", 0x21d127);
+        });
     }
 
     _shiftCommandQueue()
     {
         if (this.commandQueue.length < 1) return;
+
         let command = this.commandQueue.shift();
         if (command === null || typeof command !== typeof "" || this.bot === null) return;
 
@@ -39,7 +46,7 @@ export default class MineflayerHandler
     sanitize(command)
     {
         command = command.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '***.***.***.***');
-        command = command.replace(/[^*\s]+[.,][^*\s]+/g, "****");
+        command = command.replace(/\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b/, "**.**");
         return command;
     }
 
@@ -131,6 +138,15 @@ export default class MineflayerHandler
                 }
             },
             {
+                pattern: /^Guild > (?<name>[A-Za-z0-9_]+) (?<action>joined|left)\.$/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        `${groups.name} ${groups.action}.`,
+                        groups.action === "left" ? 0xd12121 : 0x21d127
+                    );
+                }
+            },
+            {
                 pattern: /From (?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+): (?<message>.+)/,
                 handler: (groups) => {
                     this.handleDirectMessage(groups.rank, groups.name, groups.message);
@@ -141,7 +157,19 @@ export default class MineflayerHandler
                 handler: (groups) => {
                     let roll = Math.random();
                     console.log(roll);
-                    if (roll > 0.85) {
+                    if (roll > 0.7) {
+                        this.commandQueue.push(`/p join ${groups.name}`);
+                        this.commandQueue.push("/pc ♿");
+                        this.commandQueue.push("/p leave");
+                    }
+                }
+            },
+            {
+                pattern: /^[-]+\n(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+) has invited you to join (?:\[(?<victimRank>.*?)\] )?(?<victimName>[A-Za-z0-9_]+)(?: \[(?<victimTag>.*?)\])?'s party!\nYou have 60 seconds to accept\. Click here to join!/,
+                handler: (groups) => {
+                    let roll = Math.random();
+                    console.log(roll);
+                    if (roll > 0.85 || groups.name === "Euphaa") {
                         this.commandQueue.push(`/p join ${groups.name}`);
                         this.commandQueue.push("/pc ♿");
                         this.commandQueue.push("/p leave");
@@ -215,6 +243,28 @@ export default class MineflayerHandler
             },
             {
                 pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+)(?: \[(?<tag>.*?)\])? left the guild!/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0xd12121
+                    );
+                }
+            },
+            {
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+) was promoted from (?<oldRank>[A-Za-z0-9_ ]+) to (?<newRank>[A-Za-z0-9_ ]+)/,
+                handler: (groups) => {
+                    Main.discordHandler.sendEmbed(
+                        '-----------------------------------------------------\n'
+                        + msg
+                        + '\n-----------------------------------------------------',
+                        0x21d127
+                    );
+                }
+            },
+            {
+                pattern: /(?:\[(?<rank>.*?)\] )?(?<name>[A-Za-z0-9_]+) was demoted from (?<oldRank>[A-Za-z0-9_ ]+) to (?<newRank>[A-Za-z0-9_ ]+)/,
                 handler: (groups) => {
                     Main.discordHandler.sendEmbed(
                         '-----------------------------------------------------\n'

@@ -1,7 +1,6 @@
 {
   "mineflayer": {
     "username": "",
-    "password": "",
     "auth": "microsoft",
     "host": "mc.hypixel.net",
     "port": "25565",

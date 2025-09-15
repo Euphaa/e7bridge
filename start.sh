@@ -6,7 +6,7 @@ if [ ! -f "config.json" ]; then
 fi
 
 while true; do
-  node src/Main.js
+  node --trace-exit src/Main.js
   echo "something happened... restarting in 10 seconds, press Ctrl + C to cancel"
   sleep 10
 done

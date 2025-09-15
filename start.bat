@@ -9,7 +9,7 @@ if not exist "config.json" (
 )
 
 :loop
-node src\Main.js
+node --trace-exit src\Main.js
 echo something happened... restarting in 10 seconds, press Ctrl + C to cancel
 timeout /t 10 /nobreak >nul
 goto loop

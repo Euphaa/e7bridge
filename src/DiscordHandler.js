@@ -170,7 +170,6 @@ export default class DiscordHandler
         }
 
         console.log(`Ready! Logged in as ${readyClient.user.tag}`);
-        this.sendEmbed("Bot Connected!", 0x21d127);
     }
 
     static generateMessageWithEmbed(msg, color)
